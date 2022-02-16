@@ -1,33 +1,13 @@
 import subprocess
 import re
 import os
-from pprint import pprint
 
-
-os.chdir('/home/deadcrow2021/Рабочий стол/Union commit/geneva')
-
-# path_to_file = '/home/deadcrow2021/Рабочий стол/Union commit/geneva/.git/rebase-merge/git-rebase-todo'
-path_to_file = '/home/deadcrow2021/Рабочий стол/git scrypt/first.txt'
-logs = '/home/deadcrow2021/Рабочий стол/Union commit/geneva/.git/logs/HEAD'
-
-# Delete all comments in main file
-file = open(path_to_file, 'r')
-a = file.read()
-commits = a.split('\n')
-commits = [x for x in commits if '#' not in x]
-commits = [x for x in commits if x != ''] # ['pick 4bedf4c init repo', 'pick 02160c9 user bitrix-env-adm change page /ru/consular-functions/pension/index.php on site /var/www/geneva',...
-
-with open(path_to_file, 'w') as file:
-    for i in commits:
-        file.write(i + '\n')
-
-
-leading_4_spaces = re.compile('^    ')
 
 def get_commits():
     lines = subprocess.check_output(
-        ['git', 'log', '--date=raw'], stderr=subprocess.STDOUT
-    ).decode("utf-8").split('\n')
+        ['git', 'log', '--date=raw'],
+        stderr=subprocess.STDOUT
+        ).decode("utf-8").split('\n')
     log_commits = []
     current_commit = {}
 
@@ -60,45 +40,70 @@ def get_commits():
     if current_commit:
         save_current_commit()
 
-    for i in log_commits:
-        if i['title'].split(' ')[0] == 'user':
-            user = ((i['title']).split(' '))[1]
-            i['author'] = user
-        date = int(i['date'][:i['date'].find('+')])
-        i['date'] = date # or   date + 86400
+    for commit in log_commits:
+        if commit['title'].split(' ')[0] == 'user':
+            user = ((commit['title']).split(' '))[1]
+            commit['author'] = user
+        date = int(commit['date'][:commit['date'].find('+')])
+        commit['date'] = date # or   date + 86400
 
     return log_commits
 
-reversed_list_of_commits = get_commits()[::-1] # [{'hash': '4bedf4c7cddbc1130308e4657549170fb63d54b3', 'author': 'root <root@bitrix-env>', 'date': 1621842838, 'message': '', 'title': 'init repo'}, {'hash': '02160c9a3bc1aeccd6d2f8a6136060f48bd8a7d3', 'author': 'bitrix-env-adm', 'date': 1621845769, 'message': '', 'title': 'user bitrix-env-adm change page /ru/consular-functions/pension/index.php on site /var/www/geneva'},...
 
-def get_page_from_one_commit(index):
+def get_page_from_commit_by(index):
     page = commits[index][commits[index].find('page'):].split(' ')[1]
     return page
 
-# print(commits[:5])
-# print(reversed_list_of_commits[:5])
 
-for i in range(1, len(commits)): # init not included
-    next_commit = 1
+def get_date_diff(commits_list, index):
+    commit_date = commits_list[index]['date'] - commits_list[index-1]['date']
+    return commit_date
 
-    if commits[i].split(' ')[0] == 'squash' or 'merged' in commits[i]:
+
+# change work directory for 'git log'
+os.chdir('/home/deadcrow2021/Desktop/Union commit/geneva')
+
+# path to work file
+path_to_file = '/home/deadcrow2021/Desktop/Union commit/geneva/.git/rebase-merge/git-rebase-todo'
+
+# Delete all comments in main file
+file = open(path_to_file, 'r')
+file_text = file.read()
+commits = file_text.split('\n')
+commits = [commit for commit in commits if '#' not in commit]
+commits = [commit for commit in commits if commit != ''] # ['pick 4bedf4c init repo', 'pick 02160c9 user bitrix-env-adm change page /ru/consular-functions/pension/index.php on site /var/www/geneva',...
+
+# fill file only with commits
+with open(path_to_file, 'w') as file:
+    for i in commits:
+        file.write(i + '\n')
+
+
+leading_4_spaces = re.compile('^    ')
+reversed_list_of_commits = (get_commits()[::-1]) # [{'hash': '4bedf4c7cddbc1130308e4657549170fb63d54b3', 'author': 'root <root@bitrix-env>', 'date': 1621842838, 'message': '', 'title': 'init repo'}, {'hash': '02160c9a3bc1aeccd6d2f8a6136060f48bd8a7d3', 'author': 'bitrix-env-adm', 'date': 1621845769, 'message': '', 'title': 'user bitrix-env-adm change page /ru/consular-functions/pension/index.php on site /var/www/geneva'},...
+reversed_list_of_commits = reversed_list_of_commits[len(reversed_list_of_commits)-len(commits):len(reversed_list_of_commits)]
+
+for commit_index in range(1, len(commits)):
+    next_commit_index = 1
+
+    if commits[commit_index].split(' ')[0] == 'squash' or 'merged' in commits[commit_index]: # pass squashed commit
         continue
 
-    if i == len(commits)-1:
+    if commit_index == len(commits)-1: # pass last commit
         break
 
-    for j in range(i, len(commits)):
-        if commits[i].split(' ')[1] in reversed_list_of_commits[i]['hash'] and \
-           -(reversed_list_of_commits[i]['date'] - reversed_list_of_commits[i+next_commit]['date']) <= 86400 and \
-           reversed_list_of_commits[i]['author'] == reversed_list_of_commits[i+next_commit]['author'] and \
-           get_page_from_one_commit(i) == get_page_from_one_commit(i+next_commit):
-
-            commits[i+next_commit] = commits[i+next_commit].replace('pick', 'squash')
-            next_commit += 1
+    # Check if hash in work file and log file are the same,
+    # check date, author, page name
+    for commit in range(commit_index, len(commits)):
+        if commits[commit_index].split(' ')[1] in reversed_list_of_commits[commit_index]['hash']:
+            if get_date_diff(reversed_list_of_commits, commit_index + next_commit_index) <= 86400:
+                if reversed_list_of_commits[commit_index]['author'] == reversed_list_of_commits[commit_index+next_commit_index]['author']:
+                    if get_page_from_commit_by(commit_index) == get_page_from_commit_by(commit_index+next_commit_index):
+                        commits[commit_index+next_commit_index] = commits[commit_index+next_commit_index].replace('pick', 'squash')
+                        next_commit_index += 1
         else:
             break
 
-
-with open('/home/deadcrow2021/Рабочий стол/git scrypt/result.txt', 'w') as file:
-    for i in commits:
-        file.write(i + '\n')
+with open(path_to_file, 'w') as file:
+    for commit in commits:
+        file.write(commit + '\n')
