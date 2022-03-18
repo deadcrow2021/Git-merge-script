@@ -1,13 +1,62 @@
 import subprocess
+import datetime
+import argparse
+import time
 import re
 import os
 
+arg_parser = argparse.ArgumentParser(description='Get number of commits.')
+arg_parser.add_argument("-n", "--number", help="Get number of commits", default=0, type=int)
+args = arg_parser.parse_args()
 
-def get_commits():
+BASEDIR = os.path.dirname(os.path.realpath(__file__))
+now = datetime.datetime.now()
+seconds_since_midnight = (now - now.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
+
+
+os.chdir('/home/deadcrow2021/Desktop/Union commit/geneva')
+if args.number > 0:
     lines = subprocess.check_output(
-        ['git', 'log', '--date=raw'],
+        ['git', 'log', '--oneline', '-{}'.format(args.number)],
         stderr=subprocess.STDOUT
         ).decode("utf-8").split('\n')
+else:
+    lines = subprocess.check_output(
+        ['git', 'log', '--oneline'],
+        stderr=subprocess.STDOUT
+        ).decode("utf-8").split('\n')
+
+# if args.number > 0:
+#     lines = lines[:args.number]
+
+with open('git-rebase-todo', 'w') as file:
+    for commit in lines[::-1]:
+        if commit == '':
+            continue
+        try:
+            try:
+                file.write('pick ' + commit + '\n')
+            except:
+                file.write('pick ' + commit)
+        except:
+            try:
+                file.write('pick ' + commit.encode('utf-8') + '\n')
+            except:
+                file.write('pick ' + commit.encode('utf-8'))
+
+
+def get_commits():
+    if args.number > 0:
+        lines = subprocess.check_output(
+            ['git', 'log', '--date=raw', '-{}'.format(args.number)],
+            stderr=subprocess.STDOUT
+            ).decode("utf-8").split('\n')
+    else:
+        lines = subprocess.check_output(
+            ['git', 'log', '--date=raw'],
+            stderr=subprocess.STDOUT
+            ).decode("utf-8").split('\n')
+
     log_commits = []
     current_commit = {}
 
@@ -45,7 +94,7 @@ def get_commits():
             user = ((commit['title']).split(' '))[1]
             commit['author'] = user
         date = int(commit['date'][:commit['date'].find('+')])
-        commit['date'] = date # or   date + 86400
+        commit['date'] = date
 
     return log_commits
 
@@ -60,18 +109,15 @@ def get_date_diff(commits_list, index):
     return commit_date
 
 
-# change work directory for 'git log'
-os.chdir('/home/deadcrow2021/Desktop/Union commit/geneva')
-
 # path to work file
-path_to_file = '/home/deadcrow2021/Desktop/Union commit/geneva/.git/rebase-merge/git-rebase-todo'
+path_to_file = '/home/deadcrow2021/Desktop/Union commit/geneva/git-rebase-todo'
 
 # Delete all comments in main file
 file = open(path_to_file, 'r')
 file_text = file.read()
 commits = file_text.split('\n')
 commits = [commit for commit in commits if '#' not in commit]
-commits = [commit for commit in commits if commit != ''] # ['pick 4bedf4c init repo', 'pick 02160c9 user bitrix-env-adm change page /ru/consular-functions/pension/index.php on site /var/www/geneva',...
+commits = [commit for commit in commits if commit != '']
 
 # fill file only with commits
 with open(path_to_file, 'w') as file:
@@ -80,29 +126,43 @@ with open(path_to_file, 'w') as file:
 
 
 leading_4_spaces = re.compile('^    ')
-reversed_list_of_commits = (get_commits()[::-1]) # [{'hash': '4bedf4c7cddbc1130308e4657549170fb63d54b3', 'author': 'root <root@bitrix-env>', 'date': 1621842838, 'message': '', 'title': 'init repo'}, {'hash': '02160c9a3bc1aeccd6d2f8a6136060f48bd8a7d3', 'author': 'bitrix-env-adm', 'date': 1621845769, 'message': '', 'title': 'user bitrix-env-adm change page /ru/consular-functions/pension/index.php on site /var/www/geneva'},...
-reversed_list_of_commits = reversed_list_of_commits[len(reversed_list_of_commits)-len(commits):len(reversed_list_of_commits)]
 
-for commit_index in range(1, len(commits)):
+# commits from git log
+list_of_commits = get_commits()
+reversed_list_of_commits = list_of_commits[::-1]
+
+for commit_index in range(0, len(commits)):
     next_commit_index = 1
 
-    if commits[commit_index].split(' ')[0] == 'squash' or 'merged' in commits[commit_index]: # pass squashed commit
+    if commits[commit_index].split(' ')[0] == 'fixup' in commits[commit_index]: # pass squashed commit
         continue
+
+    if int(reversed_list_of_commits[commit_index]['date']) > (time.time() - seconds_since_midnight): # dont' check today's commits
+        break
 
     if commit_index == len(commits)-1: # pass last commit
         break
 
+
     # Check if hash in work file and log file are the same,
     # check date, author, page name
     for commit in range(commit_index, len(commits)):
-        if commits[commit_index].split(' ')[1] in reversed_list_of_commits[commit_index]['hash']:
-            if get_date_diff(reversed_list_of_commits, commit_index + next_commit_index) <= 86400:
-                if reversed_list_of_commits[commit_index]['author'] == reversed_list_of_commits[commit_index+next_commit_index]['author']:
-                    if get_page_from_commit_by(commit_index) == get_page_from_commit_by(commit_index+next_commit_index):
-                        commits[commit_index+next_commit_index] = commits[commit_index+next_commit_index].replace('pick', 'squash')
-                        next_commit_index += 1
-        else:
+        if commits[commit_index].split(' ')[1] not in reversed_list_of_commits[commit_index]['hash']:
             break
+        if get_date_diff(reversed_list_of_commits, commit_index + next_commit_index) > 86400:
+            break
+        if reversed_list_of_commits[commit_index]['author'] != reversed_list_of_commits[commit_index+next_commit_index]['author']:
+            break
+        if get_page_from_commit_by(commit_index) != get_page_from_commit_by(commit_index+next_commit_index):
+            break
+
+        if subprocess.check_output(['git', 'diff', '{}^..{}'.format(
+                    reversed_list_of_commits[commit_index]['hash'],
+                    reversed_list_of_commits[commit_index + next_commit_index]['hash'])]).decode('utf-8') == '':
+            break
+ 
+        commits[commit_index+next_commit_index] = commits[commit_index+next_commit_index].replace('pick', 'fixup')
+        next_commit_index += 1
 
 with open(path_to_file, 'w') as file:
     for commit in commits:
