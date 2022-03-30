@@ -13,8 +13,7 @@ BASEDIR = os.path.dirname(os.path.realpath(__file__))
 now = datetime.datetime.now()
 seconds_since_midnight = (now - now.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
 
-
-os.chdir('/home/deadcrow2021/Desktop/Union commit/geneva')
+os.chdir(BASEDIR)
 if args.number > 0:
     lines = subprocess.check_output(
         ['git', 'log', '--oneline', '-{}'.format(args.number)],
@@ -26,10 +25,8 @@ else:
         stderr=subprocess.STDOUT
         ).decode("utf-8").split('\n')
 
-# if args.number > 0:
-#     lines = lines[:args.number]
 
-with open('git-rebase-todo', 'w') as file:
+with open(os.path.join(BASEDIR, 'git_rebase_file'), 'w') as file:
     for commit in lines[::-1]:
         if commit == '':
             continue
@@ -46,6 +43,9 @@ with open('git-rebase-todo', 'w') as file:
 
 
 def get_commits():
+    log_commits = []
+    current_commit = {}
+
     if args.number > 0:
         lines = subprocess.check_output(
             ['git', 'log', '--date=raw', '-{}'.format(args.number)],
@@ -57,8 +57,6 @@ def get_commits():
             stderr=subprocess.STDOUT
             ).decode("utf-8").split('\n')
 
-    log_commits = []
-    current_commit = {}
 
     def save_current_commit():
         title = current_commit['message'][0]
@@ -109,21 +107,11 @@ def get_date_diff(commits_list, index):
     return commit_date
 
 
-# path to work file
-path_to_file = '/home/deadcrow2021/Desktop/Union commit/geneva/git-rebase-todo'
-
 # Delete all comments in main file
-file = open(path_to_file, 'r')
+file = open(os.path.join(BASEDIR, 'git_rebase_file'), 'r')
 file_text = file.read()
 commits = file_text.split('\n')
-commits = [commit for commit in commits if '#' not in commit]
 commits = [commit for commit in commits if commit != '']
-
-# fill file only with commits
-with open(path_to_file, 'w') as file:
-    for i in commits:
-        file.write(i + '\n')
-
 
 leading_4_spaces = re.compile('^    ')
 
@@ -164,6 +152,6 @@ for commit_index in range(0, len(commits)):
         commits[commit_index+next_commit_index] = commits[commit_index+next_commit_index].replace('pick', 'fixup')
         next_commit_index += 1
 
-with open(path_to_file, 'w') as file:
+with open(os.path.join(BASEDIR, 'git_rebase_file'), 'w') as file:
     for commit in commits:
         file.write(commit + '\n')
