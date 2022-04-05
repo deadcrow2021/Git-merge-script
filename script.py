@@ -98,8 +98,18 @@ def get_commits():
 
 
 def get_page_from_commit_by(index):
-    page = commits[index][commits[index].find('page'):].split(' ')[1]
-    return page
+    try:
+        page = commits[index][commits[index].find('page'):].split(' ')[1]
+        return page
+    except:
+        files = subprocess.check_output(
+            ['git', 'diff-tree', '--no-commit-id', '--name-only',
+            '{}'.format(reversed_list_of_commits[index]['hash'])],
+            stderr=subprocess.STDOUT
+            ).decode("utf-8").split('\n')
+        if files[-1] == '':
+            del files[-1]
+        return reversed_list_of_commits[index]['hash']
 
 
 def get_date_diff(commits_list, index):
@@ -118,7 +128,8 @@ leading_4_spaces = re.compile('^    ')
 # commits from git log
 list_of_commits = get_commits()
 reversed_list_of_commits = list_of_commits[::-1]
-
+print(reversed_list_of_commits)
+print(get_page_from_commit_by(0))
 for commit_index in range(0, len(commits)):
     next_commit_index = 1
 
