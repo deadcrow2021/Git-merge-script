@@ -30,9 +30,9 @@ should be less than 1 hour
 * In commits should be mentioned that
 only one file was changed
 
-Example:
+Example:  
 commit_1: branch: master, time: 9:00 am, author: Alex, changes: script.py  
-commit_2: branch: master, time: 9:20 am, author: Alex, changes: script.py
+commit_2: branch: master, time: 9:20 am, author: Alex, changes: script.py  
 So, this to commits could be merged.
 
 -----
@@ -53,17 +53,19 @@ project/--
         |-.git  
         |-**git-script/**  
 
-----
+-----
 
 Run script
 ----------
 
 Move to script directory:
+
 ```text
-$ cd ./project/git-script
+$cd ./project/git-script
 ```  
 
 Run script file:
+
 ```text
-$ source script.sh
+$source script.sh
 ```  
